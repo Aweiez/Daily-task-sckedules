@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Planner</title>
+    <style>
+        /* Previous styles remain the same */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1, h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .login-container {
+            max-width: 400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="time"] {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .todo-item, .schedule-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .todo-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .todo-item.completed span {
+            text-decoration: line-through;
+            color: #888;
+        }
+
+        .todo-item span, .schedule-item span {
+            flex: 1;
+        }
+
+        .edit-button {
+            background-color: #2196F3;
+        }
+
+        .edit-button:hover {
+            background-color: #1976D2;
+        }
+
+        .delete-button {
+            background-color: #f44336;
+        }
+
+        .delete-button:hover {
+            background-color: #da190b;
+        }
+
+        .time-remaining {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        #mainContent {
+            display: none;
+        }
+
+        .tab-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 10px;
+            background-color: #ddd;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .error-message {
+            color: #f44336;
+            margin: 10px 0;
+        }
+
+        .logout-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="loginScreen" class="container login-container">
+        <h1>Daily Planner Login</h1>
+        <div class="input-container">
+            <input type="text" id="username" placeholder="Username">
+        </div>
+        <div class="input-container">
+            <input type="password" id="password" placeholder="Password">
+        </div>
+        <div id="loginError" class="error-message"></div>
+        <button onclick="login()">Login</button>
+        <button onclick="register()" style="background-color: #2196F3;">Register</button>
+    </div>
+
+    <div id="mainContent">
+        <button onclick="logout()" class="logout-button">Logout</button>
+        <div class="container">
+            <h1>Daily Planner</h1>
+            <div class="tab-container">
+                <button class="tab-button active" onclick="showTab('todos')">To-Do List</button>
+                <button class="tab-button" onclick="showTab('schedule')">Schedule</button>
+            </div>
+
+            <div id="todos" class="tab-content active">
+                <div class="input-container">
+                    <input type="text" id="newTask" placeholder="Add a new task...">
+                    <button onclick="addTask()">Add Task</button>
+                </div>
+                <div id="todoList"></div>
+            </div>
+
+            <div id="schedule" class="tab-content">
+                <div class="input-container">
+                    <input type="text" id="newActivity" placeholder="Activity">
+                    <input type="time" id="activityTime">
+                    <button onclick="addScheduleItem()">Add to Schedule</button>
+                </div>
+                <div id="scheduleList"></div>
+            </div>
+            
+            <div class="time-remaining" id="timeRemaining"></div>
+        </div>
+    </div>
+
+    <script>
+        // In-memory storage
+        const users = {
+            // Default user with sample data
+            'demo': {
+                password: 'demo',
+                tasks: [
+                    { id: 1, text: 'Example task', completed: false }
+                ],
+                schedule: [
+                    { id: 1, activity: 'Wake up', time: '07:00' },
+                    { id: 2, activity: 'Breakfast', time: '07:30' },
+                    { id: 3, activity: 'Work', time: '09:00' },
+                    { id: 4, activity: 'Lunch', time: '12:00' },
+                    { id: 5, activity: 'Exercise', time: '17:00' },
+                    { id: 6, activity: 'Dinner', time: '19:00' },
+                    { id: 7, activity: 'Sleep', time: '22:00' }
+                ],
+                lastReset: new Date().toDateString()
+            }
+        };
+        let currentUser = null;
+
+        // Login function
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!username || !password) {
+                errorDiv.textContent = 'Please enter both username and password';
+                return;
+            }
+
+            if (!users[username] || users[username].password !== password) {
+                errorDiv.textContent = 'Invalid username or password';
+                return;
+            }
+
+            currentUser = username;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            renderAll();
+        }
+
+        // Register function
+        function register() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!username || !password) {
+                errorDiv.textContent = 'Please enter both username and password';
+                return;
+            }
+
+            if (users[username]) {
+                errorDiv.textContent = 'Username already exists';
+                return;
+            }
+
+            users[username] = {
+                password: password,
+                tasks: [],
+                schedule: [
+                    { id: 1, activity: 'Wake up', time: '07:00' },
+                    { id: 2, activity: 'Sleep', time: '22:00' }
+                ],
+                lastReset: new Date().toDateString()
+            };
+            login();
+        }
+
+        // Logout function
+        function logout() {
+            currentUser = null;
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('loginError').textContent = '';
+        }
+
+        // Rest of the functions remain the same, just remove localStorage calls
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            document.querySelector(`button[onclick="showTab('${tabName}')"]`).classList.add('active');
+        }
+
+        function addTask() {
+            const input = document.getElementById('newTask');
+            const taskText = input.value.trim();
+            
+            if (taskText && currentUser) {
+                users[currentUser].tasks.push({
+                    text: taskText,
+                    completed: false,
+                    id: Date.now()
+                });
+                input.value = '';
+                renderTasks();
+            }
+        }
+
+        function toggleTask(id) {
+            users[currentUser].tasks = users[currentUser].tasks.map(task => 
+                task.id === id ? {...task, completed: !task.completed} : task
+            );
+            renderTasks();
+        }
+
+        function editTask(id) {
+            const task = users[currentUser].tasks.find(t => t.id === id);
+            const newText = prompt('Edit task:', task.text);
+            
+            if (newText !== null && newText.trim() !== '') {
+                users[currentUser].tasks = users[currentUser].tasks.map(task =>
+                    task.id === id ? {...task, text: newText.trim()} : task
+                );
+                renderTasks();
+            }
+        }
+
+        function deleteTask(id) {
+            users[currentUser].tasks = users[currentUser].tasks.filter(task => task.id !== id);
+            renderTasks();
+        }
+
+        function addScheduleItem() {
+            const activity = document.getElementById('newActivity').value.trim();
+            const time = document.getElementById('activityTime').value;
+            
+            if (activity && time && currentUser) {
+                users[currentUser].schedule.push({
+                    activity: activity,
+                    time: time,
+                    id: Date.now()
+                });
+                document.getElementById('newActivity').value = '';
+                document.getElementById('activityTime').value = '';
+                renderSchedule();
+            }
+        }
+
+        function editScheduleItem(id) {
+            const item = users[currentUser].schedule.find(i => i.id === id);
+            const newActivity = prompt('Edit activity:', item.activity);
+            const newTime = prompt('Edit time (HH:MM):', item.time);
+            
+            if (newActivity !== null && newTime !== null) {
+                users[currentUser].schedule = users[currentUser].schedule.map(item =>
+                    item.id === id ? {...item, activity: newActivity, time: newTime} : item
+                );
+                renderSchedule();
+            }
+        }
+
+        function deleteScheduleItem(id) {
+            users[currentUser].schedule = users[currentUser].schedule.filter(item => item.id !== id);
+            renderSchedule();
+        }
+
+        function renderTasks() {
+            const todoList = document.getElementById('todoList');
+            todoList.innerHTML = '';
+            
+            if (currentUser) {
+                users[currentUser].tasks.forEach(task => {
+                    const div = document.createElement('div');
+                    div.className = `todo-item ${task.completed ? 'completed' : ''}`;
+                    
+                    div.innerHTML = `
+                        <input type="checkbox" 
+                               ${task.completed ? 'checked' : ''} 
+                               onchange="toggleTask(${task.id})">
+                        <span>${task.text}</span>
+                        <button class="edit-button" onclick="editTask(${task.id})">Edit</button>
+                        <button class="delete-button" onclick="deleteTask(${task.id})">Delete</button>
+                    `;
+                    
+                    todoList.appendChild(div);
+                });
+            }
+        }
+
+        function renderSchedule() {
+            const scheduleList = document.getElementById('scheduleList');
+            scheduleList.innerHTML = '';
+            
+            if (currentUser) {
+                users[currentUser].schedule
+                    .sort((a, b) => a.time.localeCompare(b.time))
+                    .forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'schedule-item';
+                        
+                        div.innerHTML = `
+                            <span>${item.time}</span>
+                            <span>${item.activity}</span>
+                            <button class="edit-button" onclick="editScheduleItem(${item.id})">Edit</button>
+                            <button class="delete-button" onclick="deleteScheduleItem(${item.id})">Delete</button>
+                        `;
+                        
+                        scheduleList.appendChild(div);
+                    });
+            }
+        }
+
+        function renderAll() {
+            renderTasks();
+            renderSchedule();
+            updateTimeRemaining();
+        }
+
+        function checkReset() {
+            if (currentUser) {
+                const today = new Date().toDateString();
+                if (users[currentUser].lastReset !== today) {
+                    // Only reset completion status, not the tasks themselves
+                    users[currentUser].tasks = users[currentUser].tasks.map(task => ({
+                        ...task,
+                        completed: false
+                    }));
+                    users[currentUser].lastReset = today;
+                    renderAll();
+                }
+            }
+        }
+
+        function updateTimeRemaining() {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0);
+            
+            const timeRemaining = tomorrow - now;
+            const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            
+            document.getElementById('timeRemaining').textContent = 
+                `Checkboxes reset in ${hours}h ${minutes}m`;
+        }
+
+        // Event listeners
+        document.getElementById('newTask').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        // Set up intervals
+        setInterval(checkReset, 60000);
+        setInterval(updateTimeRemaining, 60000);
+    </script>
+</body>
+</html>
